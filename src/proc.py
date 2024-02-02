@@ -31,10 +31,14 @@ def down_sample_regions(sample_size):
                 total_elements += dataset['size']
 
             if total_elements <= sample_size:
+                total_samples = []
+                for dataset in datasets:
+                    total_samples += read_json(dataset['file'])
+
                 write_json(f"./work/samples_{organism}_{region}.json", {
                     'organism': organism,
                     'region': region,
-                    'samples': datasets
+                    'samples': total_samples
                 })
 
             else:

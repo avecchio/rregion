@@ -6,13 +6,13 @@ def seq_len(seq):
     return len(seq)
 
 def gc_content(seq):
+    counter = 0
     if len(seq) > 0:
-        counter = 0
-        for nuc in seq:
+        for nuc in seq.lower():
             if nuc == 'g' or nuc == 'c':
                 counter += 1
         return counter / len(seq)
-    return 0
+    return counter
 
 def kmer_counter(kmers):
     kmer_dict = {}
@@ -71,51 +71,3 @@ def jaccard_distance(sequence1, sequence2, k):
     distance = 1 - similarity
     #print(len(kmers1), len(kmers2), distance)
     return distance
-
-def conduct_pca():
-    import pandas as pd    
-    # Example dataset with DNA sequences
-    data = {
-        'Seq1': 'ATCGATCGATCG',
-        'Seq2': 'CGATCGATCGAT',
-        'Seq3': 'GATCGATCGATC',
-        # ... add more sequences as needed
-    }
-
-    df = pd.DataFrame(data)
-
-    from collections import Counter
-
-    def generate_kmer_counts(sequence, k):
-        kmers = [sequence[i:i+k] for i in range(len(sequence) - k + 1)]
-        return dict(Counter(kmers))
-
-    k = 3  # Specify the desired k-mer length
-    df_kmer_counts = df.applymap(lambda seq: generate_kmer_counts(seq, k)).fillna(0)
-
-    from sklearn.preprocessing import StandardScaler
-
-    scaler = StandardScaler()
-    standardized_data = scaler.fit_transform(df_kmer_counts)
-
-    from sklearn.decomposition import PCA
-
-    n_components = 2
-    pca = PCA(n_components=n_components)
-
-    principal_components = pca.fit_transform(standardized_data)
-
-    pc_df = pd.DataFrame(data=principal_components, columns=[f'PC{i}' for i in range(1, n_components + 1)])
-
-    import seaborn as sns
-    import matplotlib.pyplot as plt
-
-    # Assuming pc_df is already created
-    # pc_df = pd.DataFrame(data=principal_components, columns=[f'PC{i}' for i in range(1, n_components + 1)])
-
-    # Scatter plot
-    sns.scatterplot(x='PC1', y='PC2', data=pc_df)
-    plt.xlabel('Principal Component 1')
-    plt.ylabel('Principal Component 2')
-    plt.title('PCA of k-mers')
-    plt.show()

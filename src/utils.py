@@ -5,8 +5,8 @@ import json
 import os
 import pandas as pd
 
-def mkdir(path):
-    os.mkdir(path)
+def mkdir(directory_path): 
+    os.makedirs(directory_path, exist_ok=True)
 
 def write_json(fname, data):
     with open(fname, 'w') as jf:
@@ -22,7 +22,7 @@ def write_fasta(filename, sequence_entries):
     for sequence_entry in sequence_entries:
         entry_id = sequence_entry['id']
         sequence = Seq(sequence_entry['sequence'])
-        records.append(sequence, id=entry_id, description="")
+        records.append(SeqRecord(sequence, id=entry_id, description=""))
     SeqIO.write(records, filename, "fasta")
 
 def write_file(filename, lines):

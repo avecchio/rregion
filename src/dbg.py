@@ -29,7 +29,7 @@ class DeBruijnGraph:
 
 # Example usage
 sequences = ["ATCGATCG", "CGATCGAT", "GATCGATC"]
-k = 3
+k = 5
 
 # Construct De Bruijn graph
 de_bruijn_graph = DeBruijnGraph(sequences, k)
