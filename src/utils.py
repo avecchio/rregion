@@ -33,3 +33,6 @@ def write_file(filename, lines):
 def write_csv(filename, data):
     df = pd.DataFrame(data)
     df.to_csv(filename, index=False)
+
+def chunk_array(array, chunk_size):
+    return [array[i:i + chunk_size] for i in range(0, len(array), chunk_size)]

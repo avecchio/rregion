@@ -1,6 +1,5 @@
-from os import write
 from src.stats import gc_content, seq_len, kmerize, kmer_counter, jaccard_distance
-from src.utils import read_json, write_json, write_csv, mkdir, write_fasta
+from src.utils import chunk_array, read_json, write_json, write_csv, mkdir, write_fasta
 import pandas as pd
 import glob
 from multiprocessing import Pool
@@ -89,79 +88,6 @@ def get_region_counts():
     write_csv(f'count_stats.csv', array_counts)
 
 
-def calc_all_jaccard_distances():
-    sampled_sequence_files = glob.glob(f"./work/samples/*.json")
-    region_file_dict = {}
-    for sampled_sequence_file in sampled_sequence_files:
-        organism, region = sampled_sequence_file.replace("./work/samples/", "").replace(".json", "").split("_")[1:3]
-        if region not in region_file_dict:
-            region_file_dict[region] = []
-        region_file_dict[region].append(sampled_sequence_file)
-
-    print(region_file_dict)
-    #for region in region_file_dict:
-    #if region_type not in region_file_dict:
-    #    print(f'Region {region_type} does not exist')
-    #    print(f'Available regions are: ' + '|'.join(list(region_file_dict.keys())))
-    for region in region_file_dict:
-        sample_paths = []
-        for file in region_file_dict[region]:
-            file_data = read_json(file)
-            organism = file_data['organism']
-            region = file_data['region']
-            sample_dir = f'./work/jaccard/data/{region}/{organism}/'
-            mkdir(sample_dir)
-            for sample in file_data['samples']:
-                #print(sample)
-                sample_id = sample['id']
-                sample_fasta_file = f'{sample_dir}/{sample_id}.fasta'
-                sample_paths.append(sample_fasta_file.replace("work/jaccard/", "").replace("//", "/"))
-
-                write_fasta(f'{sample_dir}/{sample_id}.fasta', [sample])
-
-        with open(f'./work/jaccard/{region}.filelist.txt', 'w') as f:
-            # Convert each element to a string and write to the file
-            for sample_path in sample_paths:
-                f.write(sample_path + '\n')
-    '''
-    all_samples = file_data['samples']
-    jaccard_distances = []
-    counter = 0
-    total = len(all_samples) ** 2
-    for  in all_samples:
-        ref['sequence']
-        #mkdir
-
-
-        for query in all_samples:
-            counter += 1
-            ref_id = ref['id']
-            query_id = query['id']
-            print(f'Processing {region} {ref_id}:{query_id} {counter}/{total}')
-            distance = jaccard_distance(ref['sequence'], query['sequence'], k)
-            jaccard_distances.append({
-                'reference_id': ref_id,
-                'query_id': query_id,
-                'distance': distance
-            })
-
-            if counter % 10000000 == 0:
-
-                fname = f'./work/jaccard/jaccard.{region}.{k}.{counter}.json'
-                write_json(fname, {
-                    'region': region,
-                    'distances': jaccard_distances
-                })
-
-                jaccard_distances = []
-
-    fname = f'./work/jaccard/jaccard.{region}.{k}.{counter}.json'
-    write_json(fname, {
-        'region': region,
-        'distances': jaccard_distances
-    })
-    '''
-
 def get_stats(organism):
     organism_sequence_files = glob.glob(f"./work/sequences/{organism}*.json")
     for index, organism_sequence_file in enumerate(organism_sequence_files):
@@ -180,7 +106,7 @@ def get_stats(organism):
             #print(f'Processing {counter}/{total_entries} for {organism}')
             region = sequence_entry['region']
             sequence = sequence_entry['sequence']
-            sequence_stats = get_sequence_stats(region, organism, sequence, [1, 2, 3, 4])
+            sequence_stats = get_sequence_stats(region, organism, sequence, [1, 2, 3])
             stats.append(sequence_stats)
         print('Finished processing... saving')
         #df = pd.DataFrame(stats)
@@ -188,4 +114,42 @@ def get_stats(organism):
         write_json(fname, stats)
         #print(fname)
         #df.to_csv(fname, index=False)
-        
+
+def split_data():
+    sequence_files = glob.glob("./work/sequences/*.json")
+    metadata_reference = []
+    main_path = "./work/split_sequences"
+    file_index = 0
+    for sequence_file in sequence_files:
+        file_index += 1
+        sequence_entries = read_json(sequence_file)
+        chunk_index = 0
+        for chunk in chunk_array(sequence_entries, 10000):
+            chunk_index += 1
+            entry_index = 0
+            for entry in chunk:
+                entry_index += 1
+                seq_id = entry['id']
+
+                folder_path = '/'.join([
+                    main_path,
+                    str(file_index),
+                    str(chunk_index),
+                ])
+
+                mkdir(folder_path)
+
+                fasta_path = folder_path + '/' + f'{str(entry_index)}.{seq_id}.fasta'
+                #print(folder_path)
+                #print(main_path, str(file_index), str(chunk_index))
+                #print(fasta_path)
+                print(f'Creating ' + fasta_path)
+                write_fasta(fasta_path, [{
+                    'id': seq_id,
+                    'sequence': entry['sequence']
+                }])
+                del entry['sequence']
+                entry['path'] = fasta_path
+                metadata_reference.append(entry)
+
+    write_json(f'split_sequence_metadata.json', metadata_reference)
