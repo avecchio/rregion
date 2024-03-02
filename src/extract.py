@@ -140,7 +140,6 @@ def extract_sequences(datamap, ref_name):
 
     genome_dict = load_genome(data_ref['genome'])
 
-    '''
     counter = 0
     utr_sequences = extract_untranslated_regions(data_ref['transcripts'])
     c, utr_seqs = assign_uuids(utr_sequences, ref_name, counter)
@@ -194,7 +193,7 @@ def extract_sequences(datamap, ref_name):
     insulator_comp_coords = []
     insulator_exp_coords = []
     insulator_sequences = []
-    '''
+
     counter = 0
     enhancer_counter = 0
     for enhancer_file in data_ref['enhancers']:

@@ -8,27 +8,31 @@ import random
 #import seaborn as sns
 #import matplotlib.pyplot as plt
 
+def name_filter(name, items):
+    for item in items:
+        if item in name:
+            return True
+    return False
+
 def load_stats():
-    '''
     stats_files = glob.glob("./work/stats/*.json")
     total = len(stats_files)
     simple_stats_data = []
     counter = 0
     sampled_stats_data = []
     for stats_file in stats_files:
-        counter += 1
-        print(f'Loading {counter} of {total}')
-        stats_data = read_json(stats_file)
-        extracted_stats_data = []
-        for entry in stats_data:
-            del entry['kmers']
-            extracted_stats_data.append(entry)
-        simple_stats_data += extracted_stats_data
-        sampled_stats_data += random.sample(simple_stats_data, round(len(extracted_stats_data) / 1000))
-
+        if name_filter(stats_file, ['enhancers', 'insulators', 'silencers', 'promoters']):
+            counter += 1
+            print(f'Loading {counter} of {total}')
+            stats_data = read_json(stats_file)
+            extracted_stats_data = []
+            for entry in stats_data:
+                del entry['kmers']
+                extracted_stats_data.append(entry)
+            simple_stats_data += extracted_stats_data
+            sampled_stats_data += random.sample(simple_stats_data, round(len(extracted_stats_data) / 1000))
     write_json(f'stats_comb.samp.json', sampled_stats_data)
     write_json(f'stats_comb.json', simple_stats_data)
-    '''
     return pd.DataFrame(read_json(f'stats_comb.samp.json'))
 
 def plot_gc_content(stats_data):
@@ -173,8 +177,8 @@ def calc_all_jaccard_distances():
     '''
 
 def conduct_pca():
+    stats_files = glob.glob("sampled_human_*.json")
 
-    stats_files = glob.glob("./work/stats/*.json")
     total = len(stats_files)
     for k in [1, 2, 3, 4]:
         counter = 0

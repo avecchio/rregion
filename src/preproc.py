@@ -106,14 +106,11 @@ def get_stats(organism):
             #print(f'Processing {counter}/{total_entries} for {organism}')
             region = sequence_entry['region']
             sequence = sequence_entry['sequence']
-            sequence_stats = get_sequence_stats(region, organism, sequence, [1, 2, 3])
+            sequence_stats = get_sequence_stats(region, organism, sequence, [1, 2, 3, 4, 5, 6, 7])
             stats.append(sequence_stats)
         print('Finished processing... saving')
-        #df = pd.DataFrame(stats)
         fname = f'./work/stats/{organism_name}.{sequence_type}.{index}.stats.json'
         write_json(fname, stats)
-        #print(fname)
-        #df.to_csv(fname, index=False)
 
 def split_data():
     sequence_files = glob.glob("./work/sequences/*.json")
