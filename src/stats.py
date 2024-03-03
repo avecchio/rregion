@@ -2,7 +2,9 @@ import numpy as np
 from sklearn.manifold import TSNE
 import random
 import glob
+from itertools import combinations
 from src.utils import read_json, write_json
+from multiprocessing import Pool
 
 def seq_len(seq):
     return len(seq)
@@ -81,6 +83,41 @@ def jaccard_distance(sequence1, sequence2, k):
     return distance
 random.seed(42)
 
+def sample_elements(data):
+    organism, region, max_sample_size, stats_files = data
+    total_elements = 0
+    counter = 0
+    total_files = len(stats_files)
+    for stat_file in stats_files:
+        counter += 1
+        print(f'Counting {region} {counter}/{total_files}')
+        elements = read_json(stat_file)
+        total_elements += len(elements)
+
+    if total_elements < max_sample_size:
+        counter = 0
+        total_files = len(stats_files)
+        data = []
+        for stat_file in stats_files:
+            counter += 1
+            print(f'Reading {region} {counter}/{total_files}')
+            elements = read_json(stat_file)
+            data += elements
+        write_json(f'sampled_{organism}_{region}_{max_sample_size}.json', data)
+
+    else:
+        data = []
+        counter = 0
+        sample_frac = max_sample_size/total_elements
+        for stat_file in stats_files:
+            counter += 1
+            print(f'Sampling {region} {counter}/{total_files} {sample_frac}')
+            elements = read_json(stat_file)
+            print(len(elements))
+            sampled_elements = random.sample(elements, int(len(elements) * sample_frac))
+            data += sampled_elements
+        write_json(f'sampled_{organism}_{region}_{max_sample_size}.json', data)
+
 def sample_regions(max_sample_size):
     work_dir = ".\\work\\stats\\"
     # work_dir = "./work/stats/"
@@ -95,37 +132,12 @@ def sample_regions(max_sample_size):
             file_org_dict[organism][region] = []
         file_org_dict[organism][region].append(stats_file)
         
+    packets = []
     for organism in file_org_dict:
         for region in file_org_dict[organism]:
             if organism == 'human' and region in ['promoter', 'silencer', 'utrs', 'enhancers', 'insulator']:
                 stats_files = file_org_dict[organism][region]
-                total_elements = 0
-                counter = 0
-                total_files = len(stats_files)
-                for stat_file in stats_files:
-                    counter += 1
-                    print(f'Counting {counter}/{total_files}')
-                    elements = read_json(stat_file)
-                    total_elements += len(elements)
+                packets.append((organism, region, max_sample_size, stats_files))
 
-                if total_elements < max_sample_size:
-                    counter = 0
-                    total_files = len(stats_files)
-                    data = []
-                    for stat_file in stats_files:
-                        counter += 1
-                        print(f'Reading {counter}/{total_files}')
-                        elements = read_json(stat_file)
-                        data += elements
-                    write_json(f'sampled_{organism}_{region}_{max_sample_size}.json', data)
-
-                else:
-                    data = []
-                    counter = 0
-                    sample_frac = int(max_sample_size/total_elements)
-                    for stat_file in stats_files:
-                        print(f'Sampling {counter}/{total_files}')
-                        elements = read_json(stat_file)
-                        sampled_elements = random.sample(elements, sample_frac)
-                        data += sampled_elements
-                    write_json(f'sampled_{organism}_{region}_{max_sample_size}.json', data)
+    with Pool(4) as p:
+        p.map(sample_elements, packets)

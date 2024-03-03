@@ -1,5 +1,6 @@
 from src.utils import mkdir, read_json, write_fasta, write_json
-from src.plot import boxen
+from src.plot import boxen, scatterplot
+from src.stats import generate_combinations
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import pandas as pd
@@ -102,133 +103,115 @@ def bin_numbers(data_file, save_file):
     write_json(save_file, bin_counts)
 
     #bin_num = str(round(num, 2))
-    
-def calc_all_jaccard_distances():
-    sampled_sequence_files = glob.glob(f"./work/samples/*.json")
-    region_file_dict = {}
-    for sampled_sequence_file in sampled_sequence_files:
-        organism, region = sampled_sequence_file.replace("./work/samples/", "").replace(".json", "").split("_")[1:3]
-        if region not in region_file_dict:
-            region_file_dict[region] = []
-        region_file_dict[region].append(sampled_sequence_file)
 
-    print(region_file_dict)
-    #for region in region_file_dict:
-    #if region_type not in region_file_dict:
-    #    print(f'Region {region_type} does not exist')
-    #    print(f'Available regions are: ' + '|'.join(list(region_file_dict.keys())))
-    for region in region_file_dict:
-        sample_paths = []
-        for file in region_file_dict[region]:
-            file_data = read_json(file)
-            organism = file_data['organism']
-            region = file_data['region']
-            sample_dir = f'./work/jaccard/data/{region}/{organism}/'
-            mkdir(sample_dir)
-            for sample in file_data['samples']:
-                #print(sample)
-                sample_id = sample['id']
-                sample_fasta_file = f'{sample_dir}/{sample_id}.fasta'
-                sample_paths.append(sample_fasta_file.replace("work/jaccard/", "").replace("//", "/"))
-
-                write_fasta(f'{sample_dir}/{sample_id}.fasta', [sample])
-
-        with open(f'./work/jaccard/{region}.filelist.txt', 'w') as f:
-            # Convert each element to a string and write to the file
-            for sample_path in sample_paths:
-                f.write(sample_path + '\n')
-    '''
-    all_samples = file_data['samples']
-    jaccard_distances = []
-    counter = 0
-    total = len(all_samples) ** 2
-    for  in all_samples:
-        ref['sequence']
-        #mkdir
-
-
-        for query in all_samples:
-            counter += 1
-            ref_id = ref['id']
-            query_id = query['id']
-            print(f'Processing {region} {ref_id}:{query_id} {counter}/{total}')
-            distance = jaccard_distance(ref['sequence'], query['sequence'], k)
-            jaccard_distances.append({
-                'reference_id': ref_id,
-                'query_id': query_id,
-                'distance': distance
-            })
-
-            if counter % 10000000 == 0:
-
-                fname = f'./work/jaccard/jaccard.{region}.{k}.{counter}.json'
-                write_json(fname, {
-                    'region': region,
-                    'distances': jaccard_distances
-                })
-
-                jaccard_distances = []
-
-    fname = f'./work/jaccard/jaccard.{region}.{k}.{counter}.json'
-    write_json(fname, {
-        'region': region,
-        'distances': jaccard_distances
-    })
-    '''
-
-def conduct_pca():
-    stats_files = glob.glob("sampled_human_*.json")
-
-    total = len(stats_files)
-    for k in [1, 2, 3, 4]:
-        counter = 0
-        kstats = []
-        for stats_file in stats_files:
-            counter += 1
-            print(f'Loading {counter} of {total}')
-            stats_data = read_json(stats_file)
-            entry_kstats = []
-            for entry in stats_data:
-                kdata = entry['kmers'][str(k)]
-                #print(list(entry.keys()))
-                kdata['region'] = entry['region_name']
-                kdata['organism'] = entry['organism']
-                entry_kstats.append(kdata)
-            kstats += random.sample(entry_kstats, round(len(entry_kstats) / 1000))
-        write_json(f'k{k}_stats.samp.json', kstats)
-        
-    # Example dataset with DNA sequences
-    #data = {
-    #    'Seq1': 'ATCGATCGATCG',
-    #    'Seq2': 'CGATCGATCGAT',
-    #    'Seq3': 'GATCGATCGATC',
-    #    # ... add more sequences as needed
-    #}
-
-    #df = pd.DataFrame(data)
-
-    #from collections import Counter
-
-    #def generate_kmer_counts(sequence, k):
-    #    kmers = [sequence[i:i+k] for i in range(len(sequence) - k + 1)]
-    #    return dict(Counter(kmers))
-
-    #k = 3  # Specify the desired k-mer length
-    #df_kmer_counts = df.applymap(lambda seq: generate_kmer_counts(seq, k)).fillna(0)
-    '''
-    scaler = StandardScaler()
-    standardized_data = scaler.fit_transform(df_kmer_counts)
-
-    n_components = 2
+def conduct_pca(n_components, features, labels, plot_name, title, scales = []):
     pca = PCA(n_components=n_components)
-
-    principal_components = pca.fit_transform(standardized_data)
+    principal_components = pca.fit_transform(features)
 
     pc_df = pd.DataFrame(data=principal_components, columns=[f'PC{i}' for i in range(1, n_components + 1)])
+    pc_df['Region'] = labels
+    scatterplot(pc_df, plot_name, {
+        'xdata': 'PC1',
+        'ydata': 'PC2',
+        'xlabel': 'PC1',
+        'ylabel': 'PC2',
+        'title': title,
+        'xscalelog': ('xscalelog' in scales)
+        'yscalelog': ('yscalelog' in scales)
+    }, datalabels='Region')
+
+
+def distribution_analysis():
+    #stats_files = glob.glob("sampled_human_*.json")
+    kmer_lengths = [1, 2, 3, 4, 5, 6, 7]
+    kmer_combos = generate_combinations(kmer_lengths, 1, 3)
+
     '''
-    # Scatter plot
-    #sns.scatterplot(x='PC1', y='PC2', data=pc_df)
-    #plt.xlabel('Principal Component 1')
-    #plt.ylabel('Principal Component 2')
-    #plt.title('PCA of k-mers')
-    #plt.show()
+    data = []
+    for stat_file in stats_files:
+        elements = read_json(stat_file)
+        subset = random.sample(elements, 200)
+        data += subset
+    write_json(f'test_subsample_200.json', data)
+    '''
+    data = read_json(f'test_subsample_200.json')
+    for kmer_combo in kmer_combos:
+        combo_name = '.'.join([str(k) for k in list(kmer_combo)])
+        print(combo_name)
+        parsed_data = []
+        for element in data:
+            restructured_dict = {
+                'organism': element['organism'],
+                'region': element['region_name']
+            }
+            for kmer_length in kmer_combo:
+                ks = element['kmers'][str(kmer_length)]
+                restructured_dict.update(ks)
+            parsed_data.append(restructured_dict)
+        df = pd.DataFrame(parsed_data)
+        df = df.fillna(0)
+        # remove unused column
+        df = df.drop('organism', axis=1)
+        # return all features but the labels
+        features = df.drop('region', axis=1)
+
+def pca_analysis():
+    stats_files = glob.glob("sampled_human_*.json")
+    kmer_lengths = [1, 2, 3, 4, 5, 6, 7]
+    kmer_combos = generate_combinations(kmer_lengths, 1, 3)
+
+    data = []
+    for stat_file in stats_files:
+        elements = read_json(stat_file)
+        #subset = random.sample(elements, 200)
+        data += elements
+        #data += subset
+    #write_json(f'test_subsample_200.json', data)
+    
+    #data = read_json(f'test_subsample_200.json')
+    for kmer_combo in kmer_combos:
+        combo_name = '.'.join([str(k) for k in list(kmer_combo)])
+        print(combo_name)
+        parsed_data = []
+        for element in data:
+            region_name = element['region_name']
+            if region_name not in ['UTR5', 'UTR3']:
+                restructured_dict = {
+                    'organism': element['organism'],
+                    'region': region_name
+                }
+                for kmer_length in kmer_combo:
+                    ks = element['kmers'][str(kmer_length)]
+                    restructured_dict.update(ks)
+                parsed_data.append(restructured_dict)
+        df = pd.DataFrame(parsed_data)
+        df = df.fillna(0)        # remove unused column
+        df = df.drop('organism', axis=1)
+        # return all features but the labels
+        features = df.drop('region', axis=1)
+        labels = df['region']
+        for num_components in [2, 4, 6, 8, 10]:
+            try:
+                title_combo_name = ','.join([str(k) for k in list(kmer_combo)])
+                plot_title = f'PCA of Kmer Distributions (k={title_combo_name},ncomp={num_components})'
+
+                plot_name = f'./work/plots/pca_n{num_components}_{combo_name}_scatter.png'
+                conduct_pca(num_components, features, labels, plot_name, plot_title)
+
+                scaler = StandardScaler()
+                standardized_features = scaler.fit_transform(features)
+
+                standardized_plot_title = f'PCA of Standardized Kmer Distributions (k={title_combo_name},ncomp={num_components})'
+                standardized_plot_name = f'./work/plots/pca_standardized_n{num_components}_{combo_name}_scatter.png'
+                conduct_pca(num_components, standardized_features, labels, standardized_plot_name, standardized_plot_title)
+
+                log_plot_title = f'Log10 PCA of Kmer Distributions (k={title_combo_name},ncomp={num_components})'
+                log_plot_name = f'./work/plots/pca_xscalelog_n{num_components}_{combo_name}_scatter.png'
+                conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xscalelog'])
+
+                log_plot_title = f'Log10 PCA of Kmer Distributions (k={title_combo_name},ncomp={num_components})'
+                log_plot_name = f'./work/plots/pca_logscale_n{num_components}_{combo_name}_scatter.png'
+                conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xscalelog', 'yscalelog'])
+                return
+            except:
+                pass

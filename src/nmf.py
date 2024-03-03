@@ -2,7 +2,6 @@ from sklearn.decomposition import NMF
 import pandas as pd
 import numpy as np
 import json
-from itertools import combinations
 from itertools import product
 from sklearn.decomposition import PCA
 from src.utils import read_json, write_json
@@ -68,7 +67,7 @@ def nmf_regions():
                     if region in ['enhancers', 'silencers', 'promoters']:
                         data = random.choice(data, k=50000)
                     sampled_elements = len(data)
-                    write_json(f'{}_{}')
+                    #write_json(f'{}_{}')
                     # , original_length, sampled_elements
                     print('creating dataframe', original_length, sampled_elements)
                     df = pd.DataFrame(data)

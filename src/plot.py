@@ -1,11 +1,13 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
+import pandas as pd
 
 def formatplot(labels, figname):
     plt.xlabel(labels['xlabel'])
     plt.ylabel(labels['ylabel'])
     plt.title(labels['title'])
     plt.savefig(figname)
+    plt.close()
 
 def boxen(data, figname, labels):
     fig = plt.figure()
@@ -36,9 +38,16 @@ def histogram(data, figname, labels):
     sns.histplot(data, x=labels['xdata'], hue=labels['hdata'], multiple="stack")
     formatplot(labels, figname)
 
-def scatterplot(data, figname, labels):
+def scatterplot(data, figname, labels, datalabels=None):
     fig = plt.figure()
-    sns.scatterplot(data, x=labels['xdata'], y=labels['ydata'])
+    if datalabels is not None:
+        sns.scatterplot(data, x=labels['xdata'], y=labels['ydata'], hue=datalabels)
+    else:
+        sns.scatterplot(data, x=labels['xdata'], y=labels['ydata'])
+    if (labels['xlogscale']):
+        plt.xscale('log')
+    if (labels['ylogscale']):
+        plt.yscale('log')
     formatplot(labels, figname)
 
 def heatmap(data, labels, figname):
