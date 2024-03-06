@@ -40,7 +40,9 @@ def histogram(data, figname, labels):
 
 def scatterplot(data, figname, labels, datalabels=None):
     fig = plt.figure()
-    if datalabels is not None:
+    if (labels['ylogscale'] or labels['xlogscale']) and (datalabels is not None):
+        sns.scatterplot(data, x=labels['xdata'], y=labels['ydata'], hue=datalabels, alpha=0.3)
+    elif datalabels is not None:
         sns.scatterplot(data, x=labels['xdata'], y=labels['ydata'], hue=datalabels)
     else:
         sns.scatterplot(data, x=labels['xdata'], y=labels['ydata'])

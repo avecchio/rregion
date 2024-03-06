@@ -1,7 +1,8 @@
-from src.stats import gc_content, seq_len, kmerize, kmer_counter, jaccard_distance
+from src.stats import gc_content, seq_len, kmerize, kmer_counter, jaccard_distance, normalize_kmer_counts
 from src.utils import chunk_array, read_json, write_json, write_csv, mkdir, write_fasta
 import pandas as pd
 import glob
+import os
 from multiprocessing import Pool
 from itertools import combinations
 
@@ -38,7 +39,7 @@ def get_sequence_stats(region_name, organism, sequence, kmer_lengths):
     for k in kmer_lengths:
         stats['kmers'][k] = {}
         kmers = kmerize(clean_sequence, k)
-        kmer_counts = kmer_counter(kmers)
+        kmer_counts = normalize_kmer_counts(kmer_counter(kmers), len(sequence))        
         for kmer in kmer_counts:
             counts = kmer_counts[kmer]
             stats['kmers'][k][kmer] = counts
@@ -89,28 +90,34 @@ def get_region_counts():
 
 
 def get_stats(organism):
-    organism_sequence_files = glob.glob(f"./work/sequences/{organism}*.json")
+    work_path = ".\\work\\sequences\\"
+    #organism_sequence_files = glob.glob(f"./work/sequences/{organism}*.json")
+    organism_sequence_files = glob.glob(f"{work_path}{organism}*.json")
     for index, organism_sequence_file in enumerate(organism_sequence_files):
-        print(organism_sequence_file.replace("./work/sequences/", "").split("."))
-        organism_name, type_iter = organism_sequence_file.replace("./work/sequences/", "").split(".")[0:2]
+        print(organism_sequence_file.replace(work_path, "").split("."))
+        organism_name, type_iter = organism_sequence_file.replace(work_path, "").split(".")[0:2]
         sequence_type = type_iter.split("_")[0]
-        print('Loading sequences for ' + organism_name)
-        sequence_entries = read_json(organism_sequence_file)
-        total_entries = len(sequence_entries)
-        print(f'Processing {total_entries} entries')
-        stats = []
-        counter = 0
+        if sequence_type in ['enhancers', 'insulator', 'promoter', 'silencer']:
+            fname = f'./work/stats/{organism_name}.{sequence_type}.{index}.stats.json'
+            if not (os.path.isfile(fname)):
+                print('Loading sequences for ' + organism_name)
+                sequence_entries = read_json(organism_sequence_file)
+                total_entries = len(sequence_entries)
+                print(f'Processing {total_entries} entries')
+                stats = []
+                counter = 0
 
-        for sequence_entry in sequence_entries:
-            counter += 1
-            #print(f'Processing {counter}/{total_entries} for {organism}')
-            region = sequence_entry['region']
-            sequence = sequence_entry['sequence']
-            sequence_stats = get_sequence_stats(region, organism, sequence, [1, 2, 3, 4, 5, 6, 7])
-            stats.append(sequence_stats)
-        print('Finished processing... saving')
-        fname = f'./work/stats/{organism_name}.{sequence_type}.{index}.stats.json'
-        write_json(fname, stats)
+                for sequence_entry in sequence_entries:
+                    counter += 1
+                    #print(f'Processing {counter}/{total_entries} for {organism}')
+                    region = sequence_entry['region']
+                    sequence = sequence_entry['sequence']
+                    sequence_stats = get_sequence_stats(region, organism, sequence, [1, 2, 3, 4, 5, 6, 7])
+                    stats.append(sequence_stats)
+                print('Finished processing... saving')
+                write_json(fname, stats)
+            else:
+                print('has processed ' + fname)
 
 def split_data():
     sequence_files = glob.glob("./work/sequences/*.json")

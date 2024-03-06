@@ -104,7 +104,7 @@ def bin_numbers(data_file, save_file):
 
     #bin_num = str(round(num, 2))
 
-def conduct_pca(n_components, features, labels, plot_name, title, scales = []):
+def conduct_pca(n_components, features, labels, plot_name, title, scales):
     pca = PCA(n_components=n_components)
     principal_components = pca.fit_transform(features)
 
@@ -116,25 +116,23 @@ def conduct_pca(n_components, features, labels, plot_name, title, scales = []):
         'xlabel': 'PC1',
         'ylabel': 'PC2',
         'title': title,
-        'xscalelog': ('xscalelog' in scales)
-        'yscalelog': ('yscalelog' in scales)
+        'xlogscale': ('xlogscale' in scales),
+        'ylogscale': ('ylogscale' in scales)
     }, datalabels='Region')
 
 
 def distribution_analysis():
-    #stats_files = glob.glob("sampled_human_*.json")
+    stats_files = glob.glob("sampled_human_*.json")
     kmer_lengths = [1, 2, 3, 4, 5, 6, 7]
     kmer_combos = generate_combinations(kmer_lengths, 1, 3)
 
-    '''
     data = []
     for stat_file in stats_files:
         elements = read_json(stat_file)
         subset = random.sample(elements, 200)
         data += subset
-    write_json(f'test_subsample_200.json', data)
-    '''
-    data = read_json(f'test_subsample_200.json')
+    #write_json(f'test_subsample_200.json', data)
+    #data = read_json(f'test_subsample_200.json')
     for kmer_combo in kmer_combos:
         combo_name = '.'.join([str(k) for k in list(kmer_combo)])
         print(combo_name)
@@ -193,25 +191,39 @@ def pca_analysis():
         for num_components in [2, 4, 6, 8, 10]:
             try:
                 title_combo_name = ','.join([str(k) for k in list(kmer_combo)])
+                
                 plot_title = f'PCA of Kmer Distributions (k={title_combo_name},ncomp={num_components})'
 
                 plot_name = f'./work/plots/pca_n{num_components}_{combo_name}_scatter.png'
-                conduct_pca(num_components, features, labels, plot_name, plot_title)
-
+                conduct_pca(num_components, features, labels, plot_name, plot_title, [])
+            except Exception as ex:
+                print(combo_name, num_components, 'error')
+                print(ex)
+                #return
+            try:
                 scaler = StandardScaler()
                 standardized_features = scaler.fit_transform(features)
 
                 standardized_plot_title = f'PCA of Standardized Kmer Distributions (k={title_combo_name},ncomp={num_components})'
                 standardized_plot_name = f'./work/plots/pca_standardized_n{num_components}_{combo_name}_scatter.png'
-                conduct_pca(num_components, standardized_features, labels, standardized_plot_name, standardized_plot_title)
-
+                conduct_pca(num_components, standardized_features, labels, standardized_plot_name, standardized_plot_title, [])
+            except Exception as ex:
+                print(combo_name, num_components, 'error')
+                print(ex)
+                #return
+            try:
                 log_plot_title = f'Log10 PCA of Kmer Distributions (k={title_combo_name},ncomp={num_components})'
                 log_plot_name = f'./work/plots/pca_xscalelog_n{num_components}_{combo_name}_scatter.png'
-                conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xscalelog'])
-
+                conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xlogscale'])
+            except  Exception as ex:
+                print(combo_name, num_components, 'error')
+                print(ex)
+                #return
+            try:
                 log_plot_title = f'Log10 PCA of Kmer Distributions (k={title_combo_name},ncomp={num_components})'
                 log_plot_name = f'./work/plots/pca_logscale_n{num_components}_{combo_name}_scatter.png'
-                conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xscalelog', 'yscalelog'])
-                return
-            except:
-                pass
+                conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xlogscale', 'ylogscale'])
+            except Exception as ex:
+                print(combo_name, num_components, 'error')
+                print(ex)
+                #return

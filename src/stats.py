@@ -28,6 +28,12 @@ def kmer_counter(kmers):
 
     return kmer_dict
 
+def normalize_kmer_counts(kmer_counts, sequence_length):
+    normalized_counts = {}
+    for kmer, count in kmer_counts.items():
+        normalized_counts[kmer] = (count / sequence_length)
+    return normalized_counts
+
 def dict_to_list(dict, keyname, valuename):
     items = []
     for key in dict:
