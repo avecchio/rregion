@@ -5,6 +5,7 @@ import glob
 from itertools import combinations
 from src.utils import read_json, write_json
 from multiprocessing import Pool
+import numpy as np
 
 def seq_len(seq):
     return len(seq)
@@ -30,8 +31,20 @@ def kmer_counter(kmers):
 
 def normalize_kmer_counts(kmer_counts, sequence_length):
     normalized_counts = {}
+    mode = 'log'
     for kmer, count in kmer_counts.items():
-        normalized_counts[kmer] = (count / sequence_length)
+        if mode == 'len_std':
+            normalized_counts[kmer] = (count / sequence_length)
+        elif mode == 'log':
+            if count > 0:
+                normalized_counts[kmer] = np.log(count)
+            else:
+                normalized_counts[kmer] = count
+        elif mode == 'log_len_std':
+            if count > 0:
+                normalized_counts[kmer] = np.log(count / sequence_length)
+            else:
+                normalized_counts[kmer] = count
     return normalized_counts
 
 def dict_to_list(dict, keyname, valuename):
@@ -90,7 +103,7 @@ def jaccard_distance(sequence1, sequence2, k):
 random.seed(42)
 
 def sample_elements(data):
-    organism, region, max_sample_size, stats_files = data
+    store_path, organism, region, max_sample_size, stats_files = data
     total_elements = 0
     counter = 0
     total_files = len(stats_files)
@@ -109,7 +122,7 @@ def sample_elements(data):
             print(f'Reading {region} {counter}/{total_files}')
             elements = read_json(stat_file)
             data += elements
-        write_json(f'sampled_{organism}_{region}_{max_sample_size}.json', data)
+        write_json(f'{store_path}sampled_{organism}_{region}_{max_sample_size}.json', data)
 
     else:
         data = []
@@ -122,28 +135,35 @@ def sample_elements(data):
             print(len(elements))
             sampled_elements = random.sample(elements, int(len(elements) * sample_frac))
             data += sampled_elements
-        write_json(f'sampled_{organism}_{region}_{max_sample_size}.json', data)
+        write_json(f'{store_path}sampled_{organism}_{region}_{max_sample_size}.json', data)
 
 def sample_regions(max_sample_size):
-    work_dir = ".\\work\\stats\\"
+    sequences_dir = ".\\work\\sequences\\"
+    samples_dir = ".\\work\\samples\\"
     # work_dir = "./work/stats/"
-    stats_files = glob.glob(f"{work_dir}*.json")
+    stats_files = glob.glob(f"{sequences_dir}*.json")
+    print(len(stats_files))
     file_org_dict = {}
 
     for stats_file in stats_files:
-        organism, region, file_idx, file_type, file_ext = stats_file.replace(work_dir, "").split(".")
-        if organism not in file_org_dict:
-            file_org_dict[organism] = {}
-        if region not in file_org_dict[organism]:
-            file_org_dict[organism][region] = []
-        file_org_dict[organism][region].append(stats_file)
+        if 'human' in stats_file:
+            print(stats_file.replace(sequences_dir, "").split("."))
+            organism, region, file_idx, file_type, file_ext = stats_file.replace(sequences_dir, "").split(".")
+            if organism not in file_org_dict:
+                file_org_dict[organism] = {}
+            if region not in file_org_dict[organism]:
+                file_org_dict[organism][region] = []
+            file_org_dict[organism][region].append(stats_file)
         
     packets = []
     for organism in file_org_dict:
         for region in file_org_dict[organism]:
-            if organism == 'human' and region in ['promoter', 'silencer', 'utrs', 'enhancers', 'insulator']:
+            if organism == 'human' and region != 'nrcna':
                 stats_files = file_org_dict[organism][region]
-                packets.append((organism, region, max_sample_size, stats_files))
+                packets.append((samples_dir, organism, region, max_sample_size, stats_files))
+                print(samples_dir, organism, region)
 
     with Pool(4) as p:
         p.map(sample_elements, packets)
+    #for key, value in file_org_dict['human'].items():
+    #    print(key, len(value))

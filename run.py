@@ -1,9 +1,8 @@
-from src.generate import gen_options
 from src.extract import extract_sequences
 from src.preproc import get_stats, get_region_counts, split_data
 from src.proc import down_sample_regions
-from src.eda import load_stats, plot_gc_content, plot_seq_len, pca_analysis, bin_numbers
-from src.nmf import nmf_regions
+from src.eda import load_stats, plot_gc_content, plot_seq_len, pca_analysis, bin_numbers, plot_kmer_heatmaps
+from src.nmf import nmf_regions, analyze_nmf, get_metrics, nmf_generate
 from src.stats import sample_regions
 import sys
 import yaml
@@ -29,8 +28,8 @@ if __name__ == "__main__":
         extract_sequences(data_dict, 'human')
 
     elif cmd == 'getstats':
-        mkdir('./work/stats')
-        get_stats('mouse')
+        mkdir('./work/stats/log')
+        #get_stats('mouse')
         get_stats('human')
     elif cmd == 'sample':
         sample_regions(50000)
@@ -38,7 +37,14 @@ if __name__ == "__main__":
         get_region_counts()
     elif cmd == 'nmf':
         nmf_regions()
-
+    elif cmd == 'nmftestmetrics':
+        get_metrics()
+    elif cmd == 'nmfgen':
+        nmf_generate()
+    elif cmd == 'kmerheatmap':
+        plot_kmer_heatmaps()
+    elif cmd == 'analyze':
+        analyze_nmf()
     #elif cmd == 'sample':
     #    down_sample_regions(20000)
 
