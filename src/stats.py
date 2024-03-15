@@ -31,13 +31,18 @@ def kmer_counter(kmers):
 
 def normalize_kmer_counts(kmer_counts, sequence_length):
     normalized_counts = {}
-    mode = 'log'
+    mode = 'log10'
     for kmer, count in kmer_counts.items():
         if mode == 'len_std':
             normalized_counts[kmer] = (count / sequence_length)
         elif mode == 'log':
             if count > 0:
                 normalized_counts[kmer] = np.log(count)
+            else:
+                normalized_counts[kmer] = count
+        elif mode == 'log10':
+            if count > 0:
+                normalized_counts[kmer] = np.log10(count)
             else:
                 normalized_counts[kmer] = count
         elif mode == 'log_len_std':

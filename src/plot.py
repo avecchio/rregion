@@ -13,17 +13,17 @@ def formatplot(labels, figname):
 
 def boxen(data, figname, labels):
     fig = plt.figure()
-    sns.boxenplot(data, x=labels['xdata'], y=labels['hdata'], gap=.2)
-    if (labels['xlogscale']):
-        plt.xscale('log')
-    #if (labels['ylogscale']):
-    #    plt.yscale('log')
+    ax = sns.boxenplot(data, x=labels['xdata'], y=labels['hdata'], gap=.2)
+    #if (labels['xlogscale']):
+    #    plt.xscale('log')
     formatplot(labels, figname)
 
 def lineplot(data, figname, labels):
-    fig = plt.figure()
-    sns.lineplot(data, x=labels['xdata'], y=labels['ydata'], hue=labels['hue'])
-    plt.yscale('log')
+    fig = plt.figure(figsize=(12, 6))
+    ax = sns.lineplot(data, x=labels['xdata'], y=labels['ydata'], hue=labels['hue'])
+    #plt.yscale('log')
+    #plt.tight_layout()
+    sns.move_legend(ax, "upper left", bbox_to_anchor=(1,1))
     formatplot(labels, figname)
 
 def displot(data, figname, labels):
@@ -62,6 +62,18 @@ def scatterplot(data, figname, labels, datalabels=None):
     if (labels['ylogscale']):
         plt.yscale('log')
     formatplot(labels, figname)
+
+def clustermap(data, figname, labels):
+    fig = plt.figure(figsize=(8, 6))
+    g = sns.clustermap(data)
+    ax = g.ax_heatmap
+    #print(ax)
+    ax.set_xlabel(labels['xlabel'])
+    ax.set_ylabel(labels['ylabel'])
+    plt.suptitle(labels['title']) #, y=0.95)
+    plt.tight_layout()
+    plt.savefig(figname)
+    plt.close()
 
 def heatmap(data, figname, labels):
     fig = plt.figure()

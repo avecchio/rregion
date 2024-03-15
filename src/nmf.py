@@ -1,16 +1,19 @@
 from sklearn.decomposition import NMF
-import pandas as pd
-import numpy as np
-import json
 from itertools import product
 from sklearn.decomposition import PCA
 from src.utils import read_json, write_json
+from src.stats import generate_combinations
+from src.plot import lineplot, heatmap, clustermap
+from multiprocessing import Pool
+from scipy.spatial.distance import cosine
+import pandas as pd
+import numpy as np
+import json
 import matplotlib.pyplot as plt
 import glob
 import time
 import random
-from src.stats import generate_combinations
-from src.plot import lineplot
+import os
 
 def rsme(matrix1, matrix2):
     squared_diff = (matrix1-matrix2) ** 2
@@ -146,13 +149,81 @@ def nmf_regions():
                     'time': end - start
                 }))
 
-import json
-import numpy as np
 class NumpyEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+def conduct_nmf_on_features(data):
+    stats_file, kmer_combo, organism, region = data
+    data = []
+    combo_name = '.'.join([str(k) for k in list(kmer_combo)])
+    fname  = f'nmf_matrix_{organism}_{region}_{combo_name}.json'
+    if not (os.path.isfile(fname)):
+        elements = read_json(stats_file)
+        #elements = random.sample(elements, 1000)
+        element_counter = 0
+        total_elements = len(elements)
+        for element in elements:
+            element_counter += 1
+            print(f'Processing {organism} {region} {element_counter}/{total_elements}')
+            kmer_dict = {}
+            for kmer_length in list(kmer_combo):
+                element_kmers = element['kmers'][str(kmer_length)]
+                kmer_dict.update(element_kmers)
+            data.append(kmer_dict)
+        print(f'Creating dataframe for {organism} {region} {combo_name}')
+        calc_start = time.time()
+
+        df = pd.DataFrame(data)
+        df_filled = df.fillna(0)
+        data_matrix = df_filled
+
+        print(f'Starting NMF for {organism} {region} {combo_name}')
+        parameters = {
+            'num_components': 1500,
+            'init': 'random',
+            'solver': 'mu',
+            'beta_loss': 'kullback-leibler',
+            'random_state': 42,
+            'max_iter': 200
+        }
+        try:
+            nmf_model = nmf_model = NMF(
+                n_components = parameters['num_components'],
+                init = parameters['init'],
+                solver = parameters['solver'],
+                beta_loss = parameters['beta_loss'],
+                random_state = parameters['random_state'],
+                max_iter = parameters['max_iter']
+            )
+
+            nmf_model.fit(data_matrix)
+
+            W = nmf_model.transform(data_matrix)
+            H = nmf_model.components_
+            print(f'Finished NMF for {organism} {region} {combo_name}')
+
+            basis_vectors = H
+            node_embeddings = W
+
+            rsme_score = rsme(data_matrix, np.dot(node_embeddings, basis_vectors))
+            calc_end = time.time()
+
+            with open(fname, 'w') as jf:
+                jf.write(json.dumps({
+                    'columns': list(df.columns),
+                    'rsme_score': rsme_score,
+                    'parameters': parameters,
+                    'H_basis_vectors': basis_vectors,
+                    'W_node_embeddings': node_embeddings,
+                    'time': (calc_end - calc_start)
+                }, cls=NumpyEncoder))
+            print(f'Saved NMF for {organism} {region} {combo_name}')
+        except Exception as e:
+            print(e)
+
 
 def nmf_generate():
     work_dir = ".\\work\\stats\\log\\"
@@ -160,77 +231,17 @@ def nmf_generate():
     stats_files = glob.glob(f"{work_dir}*.json")
     file_org_dict = {}
 
-    kmer_lengths = [1, 2, 3, 4, 5, 6, 7]
+    kmer_lengths = [1, 2, 3, 4, 5] #, 6, 7]
     kmer_combos = generate_combinations(kmer_lengths, 1, 3)
     
+    packets = []
     for stats_file in stats_files:
         organism, region, file_idx, file_type, file_ext = stats_file.replace(work_dir, "").split(".")
-
         for kmer_combo in kmer_combos:
-            data = []
-            combo_name = '.'.join([str(k) for k in list(kmer_combo)])
+            packets.append((stats_file, kmer_combo, organism, region))
 
-            elements = read_json(stats_file)
-            #elements = random.sample(elements, 1000)
-            element_counter = 0
-            total_elements = len(elements)
-            for element in elements:
-                element_counter += 1
-                print(f'Processing {organism} {region} {element_counter}/{total_elements}')
-                kmer_dict = {}
-                for kmer_length in list(kmer_combo):
-                    element_kmers = element['kmers'][str(kmer_length)]
-                    kmer_dict.update(element_kmers)
-                data.append(kmer_dict)
-            print(f'Creating dataframe for {organism} {region} {combo_name}')
-            calc_start = time.time()
-
-            df = pd.DataFrame(data)
-            df_filled = df.fillna(0)
-            data_matrix = df_filled
-
-            print(f'Starting NMF for {organism} {region} {combo_name}')
-            parameters = {
-                'num_components': 1500,
-                'init': 'random',
-                'solver': 'mu',
-                'beta_loss': 'kullback-leibler',
-                'random_state': 42,
-                'max_iter': 200
-            }
-            try:
-                nmf_model = nmf_model = NMF(
-                    n_components = parameters['num_components'],
-                    init = parameters['init'],
-                    solver = parameters['solver'],
-                    beta_loss = parameters['beta_loss'],
-                    random_state = parameters['random_state'],
-                    max_iter = parameters['max_iter']
-                )
-
-                nmf_model.fit(data_matrix)
-
-                W = nmf_model.transform(data_matrix)
-                H = nmf_model.components_
-                print(f'Finished NMF for {organism} {region} {combo_name}')
-
-                basis_vectors = H
-                node_embeddings = W
-
-                rsme_score = rsme(data_matrix, np.dot(node_embeddings, basis_vectors))
-                calc_end = time.time()
-
-                with open(f'nmf_matrix_{organism}_{region}_{combo_name}.json', 'w') as jf:
-                    jf.write(json.dumps({
-                        'rsme_score': rsme_score,
-                        'parameters': parameters,
-                        'H_basis_vectors': basis_vectors,
-                        'W_node_embeddings': node_embeddings,
-                        'time': (calc_end - calc_start)
-                    }, cls=NumpyEncoder))
-                print(f'Saved NMF for {organism} {region} {combo_name}')
-            except Exception as e:
-                print(e)
+    with Pool(2) as p:
+        p.map(conduct_nmf_on_features, packets)
 
 def get_metrics():
     parameter_files = glob.glob("sampled_saved_params*.json")
@@ -267,219 +278,86 @@ def get_metrics():
         'hue': 'combo',
         'title': '# Components vs RSME'
     })
-    
+
+
+def analyze_single_nmf(matrix_file):
+    analysis_fname = matrix_file.replace("matrix", "results")
+    #print(matrix_file.replace(".json", "").split("_"))
+    region, kmer_combo = (matrix_file.replace(".json", "").split("_"))[-2:]
+    print(region, kmer_combo)
+
+    matrix_data = read_json(matrix_file)
+    basis_vectors = matrix_data['H_basis_vectors']
+    node_embeddings = matrix_data['W_node_embeddings']
+
+    features = matrix_data['columns']
+    df = pd.DataFrame(basis_vectors)
+    df.columns = features
+
+    columns = df.columns
+
+    num_columns = len(columns)
+
+    column_magnitudes = np.sum(df, axis=0)
+
+    feature_ranks = np.argsort(-column_magnitudes)
+
+    cosine_distances = np.zeros((num_columns, num_columns))
+
+    for i in range(num_columns):
+        for j in range(num_columns):
+            cosine_distances[i, j] = cosine(df[columns[i]], df[columns[j]])
+
+    for i in range(num_columns):
+        for j in range(num_columns):
+            print(f'Distance between {columns[i]} and {columns[j]}:', cosine_distances[i, j])
+
+    distance_df = pd.DataFrame(cosine_distances)
+    distance_df.columns = columns
+    distance_df['feature'] = columns
+
+    def series_to_json(series):
+        return json.loads(pd.Series(series).to_json())
+
+    with open(analysis_fname, 'w') as mf:
+        mf.write(json.dumps({
+            'column_magnitudes': series_to_json(column_magnitudes),
+            'feature_ranks': series_to_json(feature_ranks),
+            'cosine_distances': distance_df.to_dict('records')
+        }))
+
+    nedf = pd.DataFrame(node_embeddings)
+
+    kmer_title = kmer_combo.replace(".", ",")
+    heatmap(nedf, f'./work/analysis/node_embeddings_heatmap/{region}_{kmer_combo}_heatmap.png', {
+        'xlabel': 'Topics',
+        'ylabel': 'Samples',
+        'title': f'NMF Node Embeddings for {region} (k=[{kmer_title}])',
+    })
+
+    clustermap(nedf, f'./work/analysis/node_embeddings_heatmap/{region}_{kmer_combo}_clustermap.png', {
+        'xlabel': 'Topics',
+        'ylabel': 'Samples',
+        'title': f'NMF Node Embeddings for {region} (k=[{kmer_title}])',
+    })
+
+    distance_df = distance_df.drop('feature', axis=1)
+    print(distance_df.columns)
+    distance_df.index = distance_df.columns
+    heatmap(distance_df, f'./work/analysis/cosine_distances/{region}_{kmer_combo}_heatmap.png', {
+        'xlabel': 'Kmers',
+        'ylabel': 'Kmers',
+        'title': f'Cosine distance of Kmers for {region} (k=[{kmer_title}])',
+    })
+
+    clustermap(distance_df, f'./work/analysis/cosine_distances/{region}_{kmer_combo}_clustermap.png', {
+        'xlabel': 'Kmers',
+        'ylabel': 'Kmers',
+        'title': f'Cosine distance of Kmers for {region} (k=[{kmer_title}])',
+    })
+
+
 def analyze_nmf():
-
-    data_org_dict = {}
-    stats_dir = "./work/stats/log/"
-    #stats_dir = ".\\work\\stats\\log\\"
-    # work_dir = "./work/stats/"
-    stats_files = glob.glob(f"{stats_dir}*.json")
-    print(stats_files)
-    for stats_file in stats_files:
-        organism, region, file_idx, file_type, file_ext = stats_file.replace(stats_dir, "").split(".")
-        if organism not in data_org_dict:
-            data_org_dict[organism] = {}
-        if region not in data_org_dict[organism]:
-            data_org_dict[organism][region] = {
-                'parameter_files': []
-            }
-        data_org_dict[organism][region]['stats_file'] = stats_file
-    print(data_org_dict)
-    parameter_files = glob.glob("sampled_best_params*.json")
-    for parameter_file in parameter_files:
-        organism, region, combo = parameter_file.replace(".json", "").split("_")[3:]
-        print(organism)
-        data_org_dict[organism][region]['parameter_files'].append(parameter_file)
-
-    for organism in data_org_dict:
-        for region in data_org_dict[organism]:
-            parameter_files = data_org_dict[organism][region]['parameter_files']
-            stats_file = data_org_dict[organism][region]['stats_file']
-            #stats_data = read_json(stats_file)
-            for parameter_file in parameter_files:
-                combo = parameter_file.replace(".json", "").split("_")[-1]
-                parameters = read_json(parameter_file)['best_results']
-                print()
-
-                for element in elements:
-                    element_counter += 1
-                    kmer_dict = {}
-                    for kmer_length in list(combo.split(".")):
-                        element_kmers = element['kmers'][str(kmer_length)]
-                        kmer_dict.update(element_kmers)
-                    data.append(kmer_dict)
-                    df = pd.DataFrame(kmer_data)
-                    #'num_components'
-                    #'init'
-                    #'solver'
-                    #'beta_loss'
-                    #'kullback-leibler'
-                    #print(combo, parameters)
-
-    '''
-    parameter_file = parameter_files[0]
-    
-    '''
-    '''
-    work_dir = ".\\work\\stats\\log\\"
-    # work_dir = "./work/stats/"
-    stats_files = glob.glob(f"{work_dir}*.json")
-    file_org_dict = {}
-
-    kmer_lengths = [1, 2, 3, 4]
-    kmer_combos = generate_combinations(kmer_lengths, 1, 4)
-    
-    for stats_file in stats_files:
-        organism, region, file_idx, file_type, file_ext = stats_file.replace(work_dir, "").split(".")
-
-        for kmer_combo in kmer_combos:
-            data = []
-            combo_name = '.'.join([str(k) for k in list(kmer_combo)])
-
-            elements = read_json(stats_file)
-            elements = random.sample(elements, 1000)
-            print(organism, region, combo_name)
-            element_counter = 0
-            total_elements = len(elements)
-            for element in elements:
-                element_counter += 1
-                print(f'Processing {e
-                lement_counter}/{total_elements}')
-                kmer_dict = {}
-                for kmer_length in list(kmer_combo):
-                    element_kmers = element['kmers'][str(kmer_length)]
-                    kmer_dict.update(element_kmers)
-                data.append(kmer_dict)
-            df = pd.DataFrame(kmer_data)
-
-nmf_model = NMF(
-                            n_components = num_components,
-                            init=init,
-                            solver=solver,
-                            beta_loss=beta_loss,
-                            random_state=42,
-                            max_iter=200
-                        )
-
-            W = nmf_model.transform(data_matrix)
-            H = nmf_model.components_
-
-            basis_vectors = H
-            node_embeddings = W
-
-            df = pd.DataFrame(data)
-            column_distances = []
-
-            columns = df.columns
-
-            for i in range(len(columns)):
-                for j in range(len(columns)):
-                    distance = cosine(df[columns[i]], df[columns[j]])
-                    column_distances.append((columns[i], columns[j], distance))
-
-    '''
-'''
-# Perform grid search with cross-validation
-grid_search = GridSearchCV(estimator=nmf_model, param_grid=param_grid, scoring='neg_mean_squared_error', cv=5)
-grid_search.fit(data_matrix)  # Assuming 'data_matrix' is your input data matrix
-
-# Get the best model
-best_nmf_model = grid_search.best_estimator_
-
-# Fit the best model to your data
-best_nmf_model.fit(data_matrix)
-
-# Obtain the optimized factor matrices
-basis_vectors = best_nmf_model.components_  # Basis vectors (W)
-node_embeddings = best_nmf_model.transform(data_matrix)  # Coefficients (H)
-
-# Compute RMSE for the best model
-
-
-print("Optimized NMF Model RMSE:", rmse_score)
-print("Best Parameters:", grid_search.best_params_)
-
-
-
-# Create an array to store the labels of the embedding vectors
-embedding_vector_labels = []
-
-# Iterate over the embedding vectors and assign labels based on the associated features
-for i, embedding_vector in enumerate(node_embeddings):
-    # Get the indices of the features associated with the embedding vector
-    feature_indices = feature_embedding_mapping[i]
-    # Get the labels of the associated features
-    associated_labels = [feature_labels[idx] for idx in feature_indices]
-    # Assign the labels to the embedding vector
-    embedding_vector_labels.append(associated_labels)
-
-# Print the labels of the embedding vectors
-for i, labels in enumerate(embedding_vector_labels):
-    print(f"Embedding Vector {i+1} Labels:", labels)
-
-
-
-
-import numpy as np
-
-# Assuming 'basis_vectors' contains the basis vectors (W matrix) obtained from NMF
-# 'feature_names' contains the names or labels of the features
-
-# Compute the average magnitude of each basis vector
-basis_vector_magnitudes = np.linalg.norm(basis_vectors, axis=1)
-# Sort the basis vectors based on their magnitudes (descending order)
-sorted_indices = np.argsort(basis_vector_magnitudes)[::-1]
-
-# Get the top ten features from the sorted basis vectors
-top_features_indices = sorted_indices[:10]
-top_features = [feature_names[i] for i in top_features_indices]
-
-# Print the top ten features
-print("Top Ten Features:")
-for i, feature in enumerate(top_features, start=1):
-    print(f"{i}. {feature}")
-
-import numpy as np
-from scipy.spatial.distance import cosine
-
-# Assuming 'basis_vectors' contains the basis vectors (W matrix) obtained from NMF
-
-# Compute the cosine distance between each pair of basis vectors
-num_basis_vectors = basis_vectors.shape[0]
-cosine_distances = np.zeros((num_basis_vectors, num_basis_vectors))
-
-for i in range(num_basis_vectors):
-    for j in range(num_basis_vectors):
-        cosine_distances[i, j] = cosine(basis_vectors[i], basis_vectors[j])
-
-# Print the cosine distances
-print("Cosine Distances between Basis Vectors:")
-for i in range(num_basis_vectors):
-    for j in range(num_basis_vectors):
-        print(f"({i}, {j}): {cosine_distances[i, j]}")
-
-
-
-
-
-
-import numpy as np
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
-
-# Assuming 'node_embeddings' contains the embedding vectors learned from NMF
-
-# Reduce the dimensionality of the embedding vectors using PCA
-pca = PCA(n_components=2)  # Reduce to 2 dimensions for visualization
-embedding_2d = pca.fit_transform(node_embeddings)
-
-# Plot the reduced-dimensional embeddings
-plt.figure(figsize=(8, 6))
-plt.scatter(embedding_2d[:, 0], embedding_2d[:, 1], alpha=0.5)
-plt.title('2D Visualization of NMF Embeddings')
-plt.xlabel('Principal Component 1')
-plt.ylabel('Principal Component 2')
-plt.grid(True)
-plt.show()
-'''
+    matrix_files = glob.glob("nmf_matrix_human_*")
+    with Pool(4) as p:
+        p.map(analyze_single_nmf, matrix_files)

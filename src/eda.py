@@ -88,9 +88,8 @@ def plot_seq_len(stats_data):
     })
 
 def plot_kmer_heatmaps():
-    work_dir = ".\\work\\stats\\log\\"
-    #stats_files = glob.glob(f"{work_dir}human*.json")
-    stats_files = glob.glob(f"{work_dir}subsample*.json")
+    work_dir = ".\\work\\stats\\log10\\"
+    stats_files = glob.glob(f"{work_dir}*.json")
     kmer_lengths = [1, 2, 3, 4, 5, 6, 7]
     for kmer_length in kmer_lengths:
         print(kmer_length)
@@ -101,66 +100,19 @@ def plot_kmer_heatmaps():
             for element in elements:
                 if element['region_name'] not in ['UTR5', 'UTR3']:
                     transformed_kmers = []
-                    #print(element)
-                    #print(list(element.keys()))
                     kmers = element['kmers'][str(kmer_length)]
-                    #print(len(list(kmers.keys())))
-                    #print(list(kmers.keys())[0:10])
-                    '''
-                    for kmer in kmers:
-                        all_kmers.append({
-                            'kmer': kmer,
-                            'count': kmer[kmers],
-                            'region': element['region_name']
-                        })
-                    '''
                     kmers['region'] = element['region_name']
-                    #all_kmers += kmers
                     all_kmers.append(kmers)
         df = pd.DataFrame(all_kmers)
         df = df.fillna(0)
-        #df = df.transpose()
-        #print(df.head())
         print(df['region'].unique())
-        heatmap(df, f'./work/plots/heatmap_dist/{kmer_length}.png', {
-            #'xdata': 'k',
-            #'ydata': 'region_name',
+        heatmap(df, f'./work/plots/log10/heatmap_dist/{kmer_length}.png', {
             'categorize': 'region',
             'xlabel': 'Kmer',
             'ylabel': 'Element',
             'title': 'Log10 Kmer Distributions per Element',
         })
-        #return
 
-    '''
-    for stats_file in stats_files:
-        elements = read_json(stats_file)
-        for kmer_length in kmer_lengths:
-            all_kmers = []
-            for element in elements:
-                transformed_kmers = []
-                #print(element)
-                #print(list(element.keys()))
-                kmers = element['kmers'][str(kmer_length)]
-                print(len(list(kmers.keys())))
-                print(list(kmers.keys())[0:10])
-                kmers['region'] = element['region_name']
-                #all_kmers += kmers
-                all_kmers.append(kmers)
-            df = pd.DataFrame(all_kmers)
-            df = df.fillna(0)
-            #df = df.transpose()
-            print(df.head())
-            heatmap(df, f'./work/plots/heatmap_dist/{kmer_length}.png', {
-                #'xdata': 'k',
-                #'ydata': 'region_name',
-                'categorize': 'region',
-                'xlabel': 'Kmer',
-                'ylabel': 'Element',
-                'title': 'Log10 Kmer Distributions per Element',
-            })
-            return
-    '''
 def bin_numbers(data_file, save_file):
     bin_counts = {}
     with open(data_file) as dashf:
@@ -179,12 +131,9 @@ def bin_numbers(data_file, save_file):
                         pass
     write_json(save_file, bin_counts)
 
-    #bin_num = str(round(num, 2))
-
 def conduct_pca(n_components, features, labels, plot_name, title, scales):
     pca = PCA(n_components=n_components)
     principal_components = pca.fit_transform(features)
-    #principal_components = pca.fit(features)
 
     pc_df = pd.DataFrame(data=principal_components, columns=[f'PC{i}' for i in range(1, n_components + 1)])
     pc_df['Region'] = labels
@@ -210,8 +159,7 @@ def distribution_analysis():
         elements = read_json(stat_file)
         subset = random.sample(elements, 200)
         data += subset
-    #write_json(f'test_subsample_200.json', data)
-    #data = read_json(f'test_subsample_200.json')
+
     for kmer_combo in kmer_combos:
         combo_name = '.'.join([str(k) for k in list(kmer_combo)])
         print(combo_name)
@@ -236,17 +184,14 @@ def pca_analysis():
     work_dir = ".\\work\\stats\\log\\"
     stats_files = glob.glob(f"{work_dir}human*.json")
     kmer_lengths = [1, 2, 3, 4, 5] #, 6, 7]
-    kmer_combos = generate_combinations(kmer_lengths, 2, 5)
+    kmer_combos = generate_combinations(kmer_lengths, 1, 5)
 
     data = []
     for stat_file in stats_files:
+        print(f'Importing {stat_file}')
         elements = read_json(stat_file)
-        #subset = random.sample(elements, 200)
         data += elements
-        #data += subset
-    #write_json(f'test_subsample_200.json', data)
-    
-    #data = read_json(f'test_subsample_200.json')
+
     for kmer_combo in kmer_combos:
         combo_name = '.'.join([str(k) for k in list(kmer_combo)])
         print(combo_name)
@@ -263,9 +208,9 @@ def pca_analysis():
                     restructured_dict.update(ks)
                 parsed_data.append(restructured_dict)
         df = pd.DataFrame(parsed_data)
-        df = df.fillna(0)        # remove unused column
+        df = df.fillna(0)
         df = df.drop('organism', axis=1)
-        # return all features but the labels
+
         features = df.drop('region', axis=1)
         labels = df['region']
         for num_components in [2, 4, 8, 16, 32]:
@@ -274,39 +219,38 @@ def pca_analysis():
                 
                 plot_title = f'PCA of Kmer Distributions (k={title_combo_name})'
 
-                plot_name = f'./work/plots/pca_n{num_components}_{combo_name}_scatter.png'
+                plot_name = f'./work/plots/log/pca_n{num_components}_{combo_name}_scatter.png'
                 conduct_pca(num_components, features, labels, plot_name, plot_title, [])
             except Exception as ex:
                 print(combo_name, num_components, 'error')
                 print(ex)
-                #return
+
             try:
                 scaler = StandardScaler()
                 standardized_features = scaler.fit_transform(features)
 
                 standardized_plot_title = f'PCA of Standardized Kmer Distributions (k={title_combo_name})'
-                standardized_plot_name = f'./work/plots/pca_standardized_n{num_components}_{combo_name}_scatter.png'
+                standardized_plot_name = f'./work/plots/log/pca_standardized_n{num_components}_{combo_name}_scatter.png'
                 conduct_pca(num_components, standardized_features, labels, standardized_plot_name, standardized_plot_title, [])
             except Exception as ex:
                 print(combo_name, num_components, 'error')
                 print(ex)
-                #return
+
             try:
                 log_plot_title = f'Log10 PCA of Kmer Distributions (k={title_combo_name})'
-                log_plot_name = f'./work/plots/pca_xscalelog_n{num_components}_{combo_name}_scatter.png'
+                log_plot_name = f'./work/plots/log/pca_xscalelog_n{num_components}_{combo_name}_scatter.png'
                 conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xlogscale'])
             except  Exception as ex:
                 print(combo_name, num_components, 'error')
                 print(ex)
-                #return
+
             try:
                 log_plot_title = f'Log10 PCA of Kmer Distributions (k={title_combo_name})'
-                log_plot_name = f'./work/plots/pca_logscale_n{num_components}_{combo_name}_scatter.png'
+                log_plot_name = f'./work/plots/log/pca_logscale_n{num_components}_{combo_name}_scatter.png'
                 conduct_pca(num_components, standardized_features, labels, log_plot_name, log_plot_title, ['xlogscale', 'ylogscale'])
             except Exception as ex:
                 print(combo_name, num_components, 'error')
                 print(ex)
-                #return
 
             try:
                 pca = PCA(n_components=num_components)
@@ -319,8 +263,7 @@ def pca_analysis():
                 plt.xlabel('Principal Component')
                 plt.ylabel('Explained Variance Ratio')
                 plt.grid(axis='y')
-                plt.savefig(f'./work/plots/pca_explained_variance_n{num_components}_{combo_name}_barchart.png')
+                plt.savefig(f'./work/plots/log/pca_explained_variance_n{num_components}_{combo_name}_barchart.png')
             except Exception as ex:
                 print(combo_name, num_components, 'error')
                 print(ex)
-                #return

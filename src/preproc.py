@@ -97,7 +97,7 @@ def get_stats(organism):
     for index, organism_sequence_file in enumerate(organism_sequence_files):
         print(organism_sequence_file.replace(work_path, "").split("_"))
         organism_name, sequence_type = organism_sequence_file.replace(work_path, "").split("_")[1:3]
-        fname = f'.\\work\\stats\\log\\{organism_name}.{sequence_type}.{index}.stats.json'
+        fname = f'.\\work\\stats\\log10\\{organism_name}.{sequence_type}.{index}.stats.json'
         if not (os.path.isfile(fname)):
             print('Loading sequences for ' + organism_name)
             sequence_entries = read_json(organism_sequence_file)
@@ -108,7 +108,7 @@ def get_stats(organism):
 
             for sequence_entry in sequence_entries:
                 counter += 1
-                print(f'Processing {counter}/{total_entries} for {organism}')
+                print(f'Processing {counter}/{total_entries} for {sequence_type}')
                 region = sequence_entry['region']
                 sequence = sequence_entry['sequence']
                 sequence_stats = get_sequence_stats(region, organism, sequence, [1, 2, 3, 4, 5, 6, 7])
