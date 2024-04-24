@@ -19,22 +19,23 @@ def name_filter(name, items):
     return False
 
 def load_stats():
-    stats_files = glob.glob("./work/stats/*.json")
+    stats_files = glob.glob("./work/stats/log/*.json")
     total = len(stats_files)
     simple_stats_data = []
     counter = 0
     sampled_stats_data = []
     for stats_file in stats_files:
-        if name_filter(stats_file, ['enhancers', 'insulators', 'silencers', 'promoters']):
-            counter += 1
-            print(f'Loading {counter} of {total}')
-            stats_data = read_json(stats_file)
-            extracted_stats_data = []
-            for entry in stats_data:
-                del entry['kmers']
-                extracted_stats_data.append(entry)
-            simple_stats_data += extracted_stats_data
-            sampled_stats_data += random.sample(simple_stats_data, round(len(extracted_stats_data) / 1000))
+        counter += 1
+        print(f'Loading {counter} of {total}')
+        stats_data = read_json(stats_file)
+        extracted_stats_data = []
+        for entry in stats_data:
+            del entry['kmers']
+            if entry['region_name'] in ['UTR5', 'UTR3']:
+                entry['region_name'] = 'UTR'
+            extracted_stats_data.append(entry)
+        simple_stats_data += extracted_stats_data
+        sampled_stats_data += random.sample(simple_stats_data, round(len(extracted_stats_data) / 1000))
     write_json(f'stats_comb.samp.json', sampled_stats_data)
     write_json(f'stats_comb.json', simple_stats_data)
     return pd.DataFrame(read_json(f'stats_comb.samp.json'))
@@ -88,7 +89,7 @@ def plot_seq_len(stats_data):
     })
 
 def plot_kmer_heatmaps():
-    work_dir = ".\\work\\stats\\log10\\"
+    work_dir = ".\\work\\stats\\log\\"
     stats_files = glob.glob(f"{work_dir}*.json")
     kmer_lengths = [1, 2, 3, 4, 5, 6, 7]
     for kmer_length in kmer_lengths:
@@ -98,7 +99,12 @@ def plot_kmer_heatmaps():
             elements = read_json(stats_file)
             elements = random.sample(elements, 500)
             for element in elements:
-                if element['region_name'] not in ['UTR5', 'UTR3']:
+                if element['region_name'] in ['UTR5', 'UTR3']:
+                    transformed_kmers = []
+                    kmers = element['kmers'][str(kmer_length)]
+                    kmers['region'] = 'UTR'
+                    all_kmers.append(kmers)
+                else:
                     transformed_kmers = []
                     kmers = element['kmers'][str(kmer_length)]
                     kmers['region'] = element['region_name']
@@ -106,7 +112,7 @@ def plot_kmer_heatmaps():
         df = pd.DataFrame(all_kmers)
         df = df.fillna(0)
         print(df['region'].unique())
-        heatmap(df, f'./work/plots/log10/heatmap_dist/{kmer_length}.png', {
+        heatmap(df, f'./work/plots/log/heatmap_dist/{kmer_length}.png', {
             'categorize': 'region',
             'xlabel': 'Kmer',
             'ylabel': 'Element',
@@ -198,7 +204,16 @@ def pca_analysis():
         parsed_data = []
         for element in data:
             region_name = element['region_name']
-            if region_name not in ['UTR5', 'UTR3']:
+            if element['region_name'] in ['UTR5', 'UTR3']:
+                restructured_dict = {
+                    'organism': element['organism'],
+                    'region': 'UTR'
+                }
+                for kmer_length in kmer_combo:
+                    ks = element['kmers'][str(kmer_length)]
+                    restructured_dict.update(ks)
+                parsed_data.append(restructured_dict)
+            else:
                 restructured_dict = {
                     'organism': element['organism'],
                     'region': region_name

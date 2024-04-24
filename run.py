@@ -1,9 +1,10 @@
 from src.extract import extract_sequences
 from src.preproc import get_stats, get_region_counts, split_data
-from src.proc import down_sample_regions
+#from src.proc import down_sample_regions
 from src.eda import load_stats, plot_gc_content, plot_seq_len, pca_analysis, bin_numbers, plot_kmer_heatmaps
-from src.nmf import nmf_regions, analyze_nmf, get_metrics, nmf_generate
+from src.nmf import nmf_regions, analyze_nmf, get_metrics, nmf_generate, extract_summaries, get_top_features
 from src.stats import sample_regions
+from src.analysis import organize_ranks
 import sys
 import yaml
 from multiprocessing import Pool
@@ -26,7 +27,8 @@ if __name__ == "__main__":
         mkdir('./work/sequences')
         extract_sequences(data_dict, 'mouse')
         extract_sequences(data_dict, 'human')
-
+    elif cmd == 'rankfeatures':
+        organize_ranks()
     elif cmd == 'getstats':
         mkdir('./work/stats/log')
         #get_stats('mouse')
@@ -75,11 +77,17 @@ if __name__ == "__main__":
         
     elif cmd == 'eda':
         stats_data = load_stats()
-        #plot_gc_content(stats_data)
-        #plot_seq_len(stats_data)
+        plot_gc_content(stats_data)
+        plot_seq_len(stats_data)
 
     elif cmd == 'pca':
         pca_analysis()
 
     elif cmd == 'split_sequences':
         split_data()
+
+    elif cmd == 'summarize':
+        extract_summaries()
+
+    elif cmd == 'topfeatures':
+        get_top_features()

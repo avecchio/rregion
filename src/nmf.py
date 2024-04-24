@@ -226,7 +226,7 @@ def conduct_nmf_on_features(data):
 
 
 def nmf_generate():
-    work_dir = ".\\work\\stats\\log\\"
+    work_dir = ".\\work\\stats\\lstd\\"
     # work_dir = "./work/stats/"
     stats_files = glob.glob(f"{work_dir}*.json")
     file_org_dict = {}
@@ -236,11 +236,12 @@ def nmf_generate():
     
     packets = []
     for stats_file in stats_files:
-        organism, region, file_idx, file_type, file_ext = stats_file.replace(work_dir, "").split(".")
-        for kmer_combo in kmer_combos:
-            packets.append((stats_file, kmer_combo, organism, region))
+        if 'utr' in stats_file:
+            organism, region, file_idx, file_type, file_ext = stats_file.replace(work_dir, "").split(".")
+            for kmer_combo in kmer_combos:
+                packets.append((stats_file, kmer_combo, organism, region))
 
-    with Pool(2) as p:
+    with Pool(1) as p:
         p.map(conduct_nmf_on_features, packets)
 
 def get_metrics():
@@ -281,83 +282,144 @@ def get_metrics():
 
 
 def analyze_single_nmf(matrix_file):
-    analysis_fname = matrix_file.replace("matrix", "results")
-    #print(matrix_file.replace(".json", "").split("_"))
-    region, kmer_combo = (matrix_file.replace(".json", "").split("_"))[-2:]
-    print(region, kmer_combo)
+    analysis_fname = matrix_file.replace("matrix", "dbg_results")
+    analysis_type = "dbg"
+    #analysis_type = "log"
+    if not (os.path.isfile(analysis_fname)):
+        #print(matrix_file.replace(".json", "").split("_"))
+        region, kmer_combo = (matrix_file.replace(".json", "").split("_"))[-2:]
+        print(region, kmer_combo)
 
-    matrix_data = read_json(matrix_file)
-    basis_vectors = matrix_data['H_basis_vectors']
-    node_embeddings = matrix_data['W_node_embeddings']
+        matrix_data = read_json(matrix_file)
+        basis_vectors = matrix_data['H_basis_vectors']
+        node_embeddings = matrix_data['W_node_embeddings']
 
-    features = matrix_data['columns']
-    df = pd.DataFrame(basis_vectors)
-    df.columns = features
+        features = matrix_data['columns']
+        df = pd.DataFrame(basis_vectors)
+        df.columns = features
 
-    columns = df.columns
+        columns = df.columns
+        kmer_title = kmer_combo.replace(".", ",")
+        #heatmap(df, f'./work/analysis/basis_vectors/{region}_{kmer_combo}_heatmap.png', {
+        #    'xlabel': 'Kmers',
+        #    'ylabel': 'Topics',
+        #    'title': f'NMF Basis Vectors for {region} (k=[{kmer_title}])',
+        #})
 
-    num_columns = len(columns)
+        basis_vector_fname = f'./work/analysis/{analysis_type}/basis_vectors/{region}_{kmer_combo}_clustermap.png'
+        if not (os.path.isfile(basis_vector_fname)):
+            clustermap(df, basis_vector_fname, {
+                'xlabel': 'Kmers',
+                'ylabel': 'Topics',
+                'title': f'NMF Basis Vectors for {region} (k=[{kmer_title}])',
+            })
 
-    column_magnitudes = np.sum(df, axis=0)
+        num_columns = len(columns)
 
-    feature_ranks = np.argsort(-column_magnitudes)
+        column_magnitudes = np.sum(df, axis=0)
 
-    cosine_distances = np.zeros((num_columns, num_columns))
+        feature_ranks = np.argsort(-column_magnitudes)
 
-    for i in range(num_columns):
-        for j in range(num_columns):
-            cosine_distances[i, j] = cosine(df[columns[i]], df[columns[j]])
+        cosine_distances = np.zeros((num_columns, num_columns))
 
-    for i in range(num_columns):
-        for j in range(num_columns):
-            print(f'Distance between {columns[i]} and {columns[j]}:', cosine_distances[i, j])
+        for i in range(num_columns):
+            for j in range(num_columns):
+                cosine_distances[i, j] = cosine(df[columns[i]], df[columns[j]])
 
-    distance_df = pd.DataFrame(cosine_distances)
-    distance_df.columns = columns
-    distance_df['feature'] = columns
+        #for i in range(num_columns):
+        #    for j in range(num_columns):
+        #        print(f'Distance between {columns[i]} and {columns[j]}:', cosine_distances[i, j])
 
-    def series_to_json(series):
-        return json.loads(pd.Series(series).to_json())
+        distance_df = pd.DataFrame(cosine_distances)
+        distance_df.columns = columns
+        distance_df['feature'] = columns
 
-    with open(analysis_fname, 'w') as mf:
-        mf.write(json.dumps({
-            'column_magnitudes': series_to_json(column_magnitudes),
-            'feature_ranks': series_to_json(feature_ranks),
-            'cosine_distances': distance_df.to_dict('records')
-        }))
+        def series_to_json(series):
+            return json.loads(pd.Series(series).to_json())
 
-    nedf = pd.DataFrame(node_embeddings)
+        with open(analysis_fname, 'w') as mf:
+            mf.write(json.dumps({
+                'column_magnitudes': series_to_json(column_magnitudes),
+                'feature_ranks': series_to_json(feature_ranks),
+                'cosine_distances': distance_df.to_dict('records')
+            }))
 
-    kmer_title = kmer_combo.replace(".", ",")
-    heatmap(nedf, f'./work/analysis/node_embeddings_heatmap/{region}_{kmer_combo}_heatmap.png', {
-        'xlabel': 'Topics',
-        'ylabel': 'Samples',
-        'title': f'NMF Node Embeddings for {region} (k=[{kmer_title}])',
-    })
+        nedf = pd.DataFrame(node_embeddings)
 
-    clustermap(nedf, f'./work/analysis/node_embeddings_heatmap/{region}_{kmer_combo}_clustermap.png', {
-        'xlabel': 'Topics',
-        'ylabel': 'Samples',
-        'title': f'NMF Node Embeddings for {region} (k=[{kmer_title}])',
-    })
+        embedding_heatmap_fname = f'./work/analysis/{analysis_type}/node_embeddings_heatmap/{region}_{kmer_combo}_heatmap.png'
+        if not (os.path.isfile(embedding_heatmap_fname)):
+            heatmap(nedf, embedding_heatmap_fname, {
+                'xlabel': 'Topics',
+                'ylabel': 'Samples',
+                'title': f'NMF Node Embeddings for {region} (k=[{kmer_title}])',
+            })
 
-    distance_df = distance_df.drop('feature', axis=1)
-    print(distance_df.columns)
-    distance_df.index = distance_df.columns
-    heatmap(distance_df, f'./work/analysis/cosine_distances/{region}_{kmer_combo}_heatmap.png', {
-        'xlabel': 'Kmers',
-        'ylabel': 'Kmers',
-        'title': f'Cosine distance of Kmers for {region} (k=[{kmer_title}])',
-    })
+            #clustermap(nedf, f'./work/analysis/node_embeddings_heatmap/{region}_{kmer_combo}_clustermap.png', {
+            #    'xlabel': 'Topics',
+            #    'ylabel': 'Samples',
+            #    'title': f'NMF Node Embeddings for {region} (k=[{kmer_title}])',
+            #})
 
-    clustermap(distance_df, f'./work/analysis/cosine_distances/{region}_{kmer_combo}_clustermap.png', {
-        'xlabel': 'Kmers',
-        'ylabel': 'Kmers',
-        'title': f'Cosine distance of Kmers for {region} (k=[{kmer_title}])',
-    })
+        distance_df = distance_df.drop('feature', axis=1)
+        print(distance_df.columns)
+        distance_df.index = distance_df.columns
+        cosine_heatmap_fname = f'./work/analysis/{analysis_type}/cosine_distances/{region}_{kmer_combo}_heatmap.png'
+        if not (os.path.isfile(cosine_heatmap_fname)):
+            heatmap(distance_df, cosine_heatmap_fname, {
+                'xlabel': 'Kmers',
+                'ylabel': 'Kmers',
+                'title': f'Cosine distance of Kmers for {region} (k=[{kmer_title}])',
+            })
 
+        cosine_cluster_fname = f'./work/analysis/{analysis_type}/cosine_distances/{region}_{kmer_combo}_clustermap.png'
+        if not (os.path.isfile(cosine_cluster_fname)):
+            clustermap(distance_df, cosine_cluster_fname, {
+                'xlabel': 'Kmers',
+                'ylabel': 'Kmers',
+                'title': f'Cosine distance of Kmers for {region} (k=[{kmer_title}])',
+            })
 
 def analyze_nmf():
-    matrix_files = glob.glob("nmf_matrix_human_*")
-    with Pool(4) as p:
+    matrix_files = glob.glob("dbg_nmf_matrix_human_*")
+    #matrix_files = glob.glob("nmf_matrix_human_*")
+    with Pool(2) as p:
         p.map(analyze_single_nmf, matrix_files)
+
+def extract_summaries():
+    result_files = glob.glob("nmf_results*")
+
+    summaries = []
+    for rf in result_files:
+        region, kmer_combo = (rf.replace(".json", "").split("_"))[-2:]
+        print(rf)
+        data = read_json(rf)
+        del data['cosine_distances']
+        data['region'] = region
+        data['kmer_combo'] = kmer_combo
+        summaries.append(data)
+
+    with open('nmf_summarized_results.json', 'w') as jf:
+        jf.write(json.dumps(summaries))
+
+
+def get_top_features():
+    with open('nmf_summarized_results.json') as jf:
+        data = json.loads(jf.read())
+
+    results_collection = {}
+    for entry in data:
+        features_types = entry['kmer_combo']
+        ranked_features = [{'kmer': key, 'rank': value} for key, value in entry['feature_ranks'].items()]
+        region = entry['region']
+        if features_types not in results_collection:
+            results_collection[features_types] = {}
+        if region not in results_collection[features_types]:
+            results_collection[features_types][region] = sorted(ranked_features, key=lambda x: x['rank'], reverse=True)
+
+    for feature_type in results_collection:
+         for region in results_collection[feature_type]:
+            ranked_features = results_collection[feature_type][region]
+            extracted_features = [ranked_feature['kmer'] for ranked_feature in ranked_features]
+            features_string = '|'.join(extracted_features[0:10])
+            print(f'{feature_type} {region}: {features_string}')
+    

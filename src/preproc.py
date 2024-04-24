@@ -6,25 +6,6 @@ import os
 from multiprocessing import Pool
 from itertools import combinations
 
-def f(x):
-    return x*x
-
-def nuc_enc(nuc, binarize):
-    bin_transform = {'a': [0,0,0,1], 't': [0,0,1,0], 'g': [0,1,0,0], 'c': [1,0,0,0], 'n': [1, 1, 1, 1]}
-    dec_transform = {'a': 1, 't': 3, 'g': 7, 'c': 15, 'n': 0}
-    if binarize:
-        return bin_transform[nuc]
-    else:
-        return dec_transform[nuc]
-
-def one_hot_enc(seq, binarize=True):
-    return [nuc_enc(nuc, binarize) for nuc in seq]
-
-def iupac_clean(seq):
-    for char in 'ryswkmbdhv':
-        seq = seq.replace(char, 'n')
-    return seq
-
 def get_sequence_stats(region_name, organism, sequence, kmer_lengths):
     clean_sequence = iupac_clean(sequence)
 
@@ -45,16 +26,6 @@ def get_sequence_stats(region_name, organism, sequence, kmer_lengths):
             counts = kmer_counts[kmer]
             stats['kmers'][k][kmer] = counts
     return stats
-
-def exec_jaccard_dist(data_package):
-    #print(data_package)
-    ref_entry, query_entry, k = data_package
-    distance = jaccard_distance(ref_entry['sequence'], query_entry['sequence'], k)
-    return {
-        'reference_id': ref_entry['id'],
-        'query_id': query_entry['id'],
-        'distance': distance
-    }
 
 def get_region_counts():
     counts_dict = {}
@@ -97,7 +68,7 @@ def get_stats(organism):
     for index, organism_sequence_file in enumerate(organism_sequence_files):
         print(organism_sequence_file.replace(work_path, "").split("_"))
         organism_name, sequence_type = organism_sequence_file.replace(work_path, "").split("_")[1:3]
-        fname = f'.\\work\\stats\\log10\\{organism_name}.{sequence_type}.{index}.stats.json'
+        fname = f'.\\work\\stats\\lstd\\{organism_name}.{sequence_type}.{index}.stats.json'
         if not (os.path.isfile(fname)):
             print('Loading sequences for ' + organism_name)
             sequence_entries = read_json(organism_sequence_file)
